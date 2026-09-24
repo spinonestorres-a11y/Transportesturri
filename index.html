@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es-CL" data-tema="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gestión de Transporte</title>
+  <meta name="description" content="Registro de viajes de transporte: ingresos, costos directos y márgenes por viaje y por mes.">
+  <meta name="theme-color" content="#f3f4f1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Transporte">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="sin-sesion">
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+
+  <div class="app">
+    <aside class="lateral">
+      <div class="marca">
+        <span class="marca-simbolo" aria-hidden="true"></span>
+        <span class="marca-nombre" data-nombre-app>Gestión de Transporte</span>
+      </div>
+      <a class="btn btn-primario btn-bloque" href="#/viajes/nuevo">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <span>Nuevo viaje</span>
+      </a>
+      <nav aria-label="Menú lateral">
+        <ul class="nav-lateral" id="nav-lateral"></ul>
+      </nav>
+      <div class="lateral-pie">
+        <button type="button" class="indicador-sync" id="sync-lateral" aria-label="Estado de sincronización"></button>
+        <div class="lateral-usuario" id="lateral-usuario"></div>
+      </div>
+    </aside>
+
+    <div class="principal">
+      <header class="barra-superior">
+        <span class="marca-simbolo" aria-hidden="true"></span>
+        <span class="barra-nombre" data-nombre-app>Gestión de Transporte</span>
+        <button type="button" class="indicador-sync" id="sync-movil" aria-label="Estado de sincronización"></button>
+      </header>
+      <div id="avisos-globales" class="avisos-globales"></div>
+      <main id="contenido" class="contenido" tabindex="-1">
+        <p class="cargando">Cargando…</p>
+        <noscript><p>Esta aplicación necesita JavaScript activado.</p></noscript>
+      </main>
+    </div>
+
+    <nav class="nav-inferior" aria-label="Menú inferior">
+      <ul id="nav-inferior-lista"></ul>
+    </nav>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="calculos.js"></script>
+  <script src="db.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
