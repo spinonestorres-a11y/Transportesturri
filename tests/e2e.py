@@ -61,6 +61,11 @@ def api(accion, token=None, **datos):
     return json.loads(urllib.request.urlopen(req).read())
 
 
+def fallar(tipo, n):
+    req = urllib.request.Request(API + '/__fallas', data=json.dumps({'tipo': tipo, 'n': n}).encode(), headers={'Content-Type': 'text/plain'})
+    return json.loads(urllib.request.urlopen(req).read())
+
+
 def token_de(usuario):
     h = hashlib.sha256(f'gestion-transporte|{usuario}|{USUARIOS[usuario][1]}'.encode()).hexdigest()
     return api('login', usuario=usuario, claveHash=h)['token']
@@ -146,6 +151,24 @@ try:
         adm.fill('#login-usuario', 'admin'); adm.fill('#login-clave', 'mala-clave'); adm.click('button:has-text("Ingresar")')
         adm.wait_for_selector('.login .error:not([hidden])')
         check('Clave incorrecta muestra error', 'incorrectos' in adm.locator('.login .error').inner_text())
+
+        # Fallas transitorias de Google (404 en la redirección y POST convertido en GET): el login reintenta solo
+        n_consola = len(errores_consola)
+        fallar('404', 1); fallar('doget', 1)
+        login(adm, 'admin')
+        check('Login reintenta solo ante 404 y respuesta de doGet de Google', adm.locator('.vacio').count() == 1)
+        ir(adm, 'mas'); adm.click('button:has-text("Cerrar sesión")'); adm.wait_for_selector('#login-usuario')
+        fallar('404', 5)
+        adm.fill('#login-usuario', 'admin'); adm.fill('#login-clave', USUARIOS['admin'][1]); adm.click('button:has-text("Ingresar")')
+        adm.wait_for_selector('.login .error:not([hidden])', timeout=20000)
+        check('Si Google sigue fallando, el login explica que reintente', 'intenta de nuevo' in adm.locator('.login .error').inner_text())
+        for _ in range(5):  # consume las fallas simuladas que quedaron
+            try:
+                api('ping')
+            except Exception:
+                pass
+        # Los 404 simulados dejan su aviso en la consola del navegador: son esperados.
+        errores_consola[n_consola:] = [e for e in errores_consola[n_consola:] if 'status of 404' not in e]
         login(adm, 'admin')
         check('Admin entra y ve el inicio vacío', adm.locator('.vacio').count() == 1)
         check('Indicador de sincronización visible', 'Sincronizado' in adm.locator('#sync-lateral').inner_text())

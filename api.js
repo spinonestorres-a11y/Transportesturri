@@ -86,8 +86,44 @@
 
   const configurada = () => /^https?:\/\/\S+$/.test(URL_API);
 
-  /* ---------- Llamada al backend ---------- */
+  /* ---------- Llamada al backend ----------
+     Apps Script a veces responde mal sin que haya un problema real: tarda
+     mucho al "despertar", devuelve 404 en la redirección a googleusercontent o
+     convierte el POST en GET (llega la respuesta de doGet). Esas fallas son
+     transitorias: las consultas y el login se reintentan solos. Las escrituras
+     no se repiten aquí (podrían aplicarse dos veces); los viajes y fotos ya se
+     reintentan desde la cola con su identificador de operación. */
+  const ACCIONES_REPETIBLES = ['ping', 'login', 'logout', 'revision', 'datos', 'obtenerAdjunto'];
+  const esperar = ms => new Promise(r => setTimeout(r, ms));
+
   async function llamar(accion, cuerpo = {}, opciones = {}) {
+    const intentos = opciones.intentos || (ACCIONES_REPETIBLES.indexOf(accion) !== -1 ? 3 : 1);
+    let ultimo = null;
+    let timeouts = 0;
+    for (let i = 0; i < intentos; i++) {
+      if (i > 0) {
+        await esperar(1500 * i);
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
+      }
+      try {
+        return await llamarUnaVez(accion, cuerpo, opciones);
+      } catch (err) {
+        ultimo = err;
+        if (!err.transitorio) throw err;
+        // Una espera larga ya costó mucho: se reintenta a lo más una vez tras un timeout.
+        if (err.timeout && ++timeouts > 1) break;
+      }
+    }
+    throw ultimo;
+  }
+
+  function errorTransitorio(mensaje, extra) {
+    const e = new ErrorApi(mensaje, 'red', null, true);
+    e.transitorio = true;
+    return Object.assign(e, extra || {});
+  }
+
+  async function llamarUnaVez(accion, cuerpo, opciones) {
     if (!configurada()) throw new ErrorApi('Falta configurar la dirección del servidor (API_URL en config.js).', 'configuracion');
     if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new ErrorApi('Sin conexión a internet.', 'red', null, true);
     const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -104,16 +140,22 @@
       });
     } catch (err) {
       const abortado = err && err.name === 'AbortError';
-      throw new ErrorApi(abortado ? 'El servidor tardó demasiado en responder.' : 'No se pudo conectar con el servidor.', 'red', null, true);
+      throw errorTransitorio(abortado ? 'El servidor tardó demasiado en responder.' : 'No se pudo conectar con el servidor.', { timeout: abortado });
     } finally {
       if (temporizador) clearTimeout(temporizador);
     }
-    if (!resp.ok) throw new ErrorApi(`El servidor respondió con error ${resp.status}.`, 'red', null, true);
+    if (!resp.ok) throw errorTransitorio(`El servidor de Google respondió con error ${resp.status}.`);
     let json;
     try {
       json = await resp.json();
     } catch (err) {
-      throw new ErrorApi('Respuesta no válida del servidor. Revisa la URL de config.js y que la implementación de Apps Script tenga acceso "Cualquier persona".', 'formato');
+      const e = new ErrorApi('Respuesta no válida del servidor. Revisa la URL de config.js y que la implementación de Apps Script tenga acceso "Cualquier persona".', 'formato');
+      e.transitorio = true;
+      throw e;
+    }
+    // Google convirtió el POST en GET: la respuesta es la de doGet, no la de la acción pedida.
+    if (accion !== 'ping' && json && json.app && /La app usa POST/.test(json.mensaje || '')) {
+      throw errorTransitorio('Google no entregó la solicitud completa.');
     }
     if (json.error) {
       if (json.error === 'sesion') {

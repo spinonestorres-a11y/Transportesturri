@@ -28,7 +28,7 @@
   /* =======================================================================
      1. Configuración
      ======================================================================= */
-  const APP_VERSION = '2.0.1'; // Mantener igual a VERSION en sw.js
+  const APP_VERSION = '2.0.2'; // Mantener igual a VERSION en sw.js
   const NOMBRE_POR_DEFECTO = 'Gestión de Transporte';
   const INTERVALO_SYNC_MS = Math.max(15, Number((window.CONFIG_APP || {}).INTERVALO_SYNC_SEG) || 45) * 1000;
   const IMG = {
@@ -641,6 +641,7 @@
     const verClave = h('input', { type: 'checkbox', id: 'login-ver' });
     verClave.addEventListener('change', () => { inClave.type = verClave.checked ? 'text' : 'password'; });
     const error = h('p', { class: 'error', role: 'alert', hidden: true });
+    const aviso = h('p', { class: 'texto-suave', role: 'status', hidden: true });
     const btn = h('button', { type: 'submit', class: 'btn btn-primario btn-grande btn-bloque' }, 'Ingresar');
     const form = h('form', { class: 'tarjeta login-tarjeta', novalidate: true, 'aria-labelledby': 'login-titulo' },
       marcaLogin,
@@ -650,7 +651,8 @@
       h('div', { class: 'campo' }, h('label', { for: 'login-clave' }, 'Clave'), inClave),
       h('div', { class: 'campo campo-check' }, h('div', { class: 'check' }, verClave, h('label', { for: 'login-ver' }, 'Mostrar clave'))),
       error,
-      btn);
+      btn,
+      aviso);
     form.addEventListener('submit', async ev => {
       ev.preventDefault();
       if (btn.disabled) return;
@@ -663,15 +665,25 @@
       btn.disabled = true;
       btn.textContent = 'Ingresando…';
       error.hidden = true;
+      aviso.hidden = true;
+      // Apps Script puede tardar varios segundos cuando lleva rato sin uso.
+      const lento = setTimeout(() => {
+        aviso.textContent = 'El servidor de Google está tardando en responder. Espera un momento; la app reintenta sola.';
+        aviso.hidden = false;
+      }, 6000);
       try {
         await Nube.iniciarSesion(inUsuario.value, inClave.value);
         construirEstado();
         await arrancarTrasSesion();
       } catch (err) {
-        error.textContent = err.red ? 'No hay conexión con el servidor. Para ingresar se necesita internet.' : err.message;
+        error.textContent = !err.red ? err.message
+          : navigator.onLine === false ? 'No hay conexión a internet. Para ingresar se necesita conexión.'
+            : 'El servidor de Google no respondió. Suele pasar cuando la app lleva rato sin uso: intenta de nuevo en unos segundos.';
         error.hidden = false;
         inClave.select();
       } finally {
+        clearTimeout(lento);
+        aviso.hidden = true;
         btn.disabled = false;
         btn.textContent = 'Ingresar';
       }

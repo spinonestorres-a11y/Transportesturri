@@ -84,8 +84,8 @@ window.CONFIG_APP = {
 ## Cómo publicar cambios
 
 **App (GitHub Pages)**: cada vez que cambies algo, sube la versión en **dos** lugares, con el mismo valor:
-- `sw.js` → `const VERSION = '2.0.2';`
-- `app.js` → `const APP_VERSION = '2.0.2';`
+- `sw.js` → `const VERSION = '2.0.3';`
+- `app.js` → `const APP_VERSION = '2.0.3';`
 
 Si `sw.js` no cambia, los celulares siguen usando la versión guardada. Con el cambio, aparece "Hay una nueva versión disponible · Actualizar ahora", la app se recarga y se borra la caché anterior. La sesión y los pendientes se conservan.
 
@@ -150,14 +150,14 @@ node tests/servidor-prueba.js --puerto 8787 --demo \
 python3 -m http.server 8080               # abrir http://localhost:8080
 ```
 
-`--latencia 1500` simula la demora típica de Apps Script.
+`--latencia 1500` simula la demora típica de Apps Script. Para simular las fallas de Google, envía un POST a `/exec/__fallas` con `{"tipo":"404","n":2}` (o `"doget"`).
 
 ## Pruebas
 
 ```bash
 node tests/calculos.test.js     # 53 pruebas: fórmulas, parseo, validación y Calculos.gs == calculos.js
 node tests/backend.test.js      # 58 pruebas del Codigo.gs real sobre el simulador (55 sin el archivo histórico)
-python3 tests/e2e.py            # 60 pruebas end-to-end (58 sin el archivo histórico; requiere playwright y pillow)
+python3 tests/e2e.py            # 62 pruebas end-to-end (60 sin el archivo histórico; requiere playwright y pillow)
 ```
 
 - **Backend**: login y bloqueo, permisos por rol, conflicto de versión, idempotencia, correlativos únicos, fotos en Drive, importación, protección contra fórmulas en celdas y crecimiento de la hoja más allá de su tamaño.
@@ -194,7 +194,11 @@ Caso de la reunión: 1.000 km × $1.650 − 1.000 km × $1.440 = **$210.000**. P
 
 ## Límites de Apps Script (cuenta gmail gratuita)
 
-- Cada operación tarda de 1 a 3 s. La app no se bloquea: guarda primero en el teléfono y envía en segundo plano.
+- Cada operación tarda de 1 a 6 s. La app no se bloquea: guarda primero en el teléfono y envía en segundo plano.
+- Cuando la app lleva rato sin uso, Google puede tardar 10 a 30 s en la primera llamada. A veces responde con 404 o entrega la respuesta de `doGet` en vez de la de `doPost`. Son fallas transitorias:
+  - el login y las consultas se reintentan solos hasta 3 veces;
+  - los viajes y las fotos quedan en la cola y se reenvían sin duplicarse;
+  - si después de los reintentos igual falla, la app pide intentar de nuevo en unos segundos.
 - Hay un máximo de 30 ejecuciones simultáneas por usuario dueño, de sobra para 5 personas.
 - Las propiedades del script admiten **50.000 lecturas o escrituras al día** (500.000 con Google Workspace). Cada revisión de cambios usa unas 2. Con 5 personas con la app abierta todo el día quedan unas 8.000. Si se suman más usuarios, sube `INTERVALO_SYNC_SEG` en `config.js`.
 - Para miles de viajes por año, la planilla funciona bien. Si se llega a decenas de miles, conviene archivar años anteriores en otra hoja.

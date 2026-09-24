@@ -13,6 +13,9 @@
               admin / clave-admin-1.
    --estado   guarda los datos en un archivo JSON entre reinicios.
    --latencia agrega una demora en ms para simular la red de Apps Script.
+   Fallas simuladas (como las que a veces entrega Google):
+     POST /exec/__fallas  cuerpo {"tipo":"404"|"doget","n":2}
+     → las siguientes n solicitudes POST fallan con ese tipo.
    Luego en config.js: API_URL: 'http://127.0.0.1:8787/exec'
    ========================================================================= */
 'use strict';
@@ -47,6 +50,7 @@ guardar();
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
 let atendidas = 0;
+const fallas = [];   // cola de fallas simuladas: '404' | 'doget'
 
 http.createServer((req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
@@ -54,9 +58,22 @@ http.createServer((req, res) => {
   let cuerpo = '';
   req.on('data', d => { cuerpo += d; });
   req.on('end', () => {
+    if (req.url.startsWith('/exec/__fallas')) {
+      const f = JSON.parse(cuerpo || '{}');
+      for (let i = 0; i < (f.n || 1); i++) fallas.push(f.tipo || '404');
+      res.writeHead(200, Object.assign({ 'Content-Type': 'application/json' }, cors));
+      res.end(JSON.stringify({ ok: true, pendientes: fallas.length }));
+      return;
+    }
+    const falla = req.method === 'POST' ? fallas.shift() : null;
     setTimeout(() => {
+      if (falla === '404') {
+        res.writeHead(404, Object.assign({ 'Content-Type': 'text/html' }, cors));
+        res.end('<html><title>No se encontró la página</title></html>');
+        return;
+      }
       try {
-        const salida = req.method === 'POST'
+        const salida = req.method === 'POST' && falla !== 'doget'
           ? env.gas('doPost')({ postData: { contents: cuerpo, type: req.headers['content-type'] || 'text/plain' } })
           : env.gas('doGet')({});
         atendidas += 1;
